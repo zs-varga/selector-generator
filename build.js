@@ -22,15 +22,17 @@ const devBuildOptions = {
 };
 
 // Production build: minified and obfuscated
+// Using IIFE format to avoid ES6 export statements in browser context
 const prodBuildOptions = {
   entryPoints: [join(__dirname, 'src', 'index.js')],
   bundle: true,
   outfile: join(__dirname, 'dist', 'selector-generator.min.js'),
-  format: 'esm',
+  format: 'iife',
   platform: 'browser',
   target: 'es2020',
   minify: true,
   sourcemap: true,
+  globalName: 'SelectorGeneratorModule',
   logLevel: 'info',
 };
 
