@@ -32,7 +32,6 @@ const prodBuildOptions = {
   target: 'es2020',
   minify: true,
   sourcemap: true,
-  globalName: 'SelectorGeneratorModule',
   logLevel: 'info',
 };
 

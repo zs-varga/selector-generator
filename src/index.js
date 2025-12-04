@@ -15,11 +15,11 @@ const SelectorGenerator = (function() {
   };
 })();
 
-// Export for module systems
-export { SelectorGenerator };
-export { SelectorGeneratorClass };
-
-// Also set as global for backward compatibility (if in browser)
+// Set as global for backward compatibility (if in browser)
 if (typeof window !== 'undefined') {
   window.SelectorGenerator = SelectorGenerator;
 }
+
+// Export for module systems (ESM builds only)
+export { SelectorGenerator };
+export { SelectorGeneratorClass };
