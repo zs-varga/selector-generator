@@ -1,0 +1,31 @@
+{
+  "name": "css-selector-generator",
+  "version": "1.0.0",
+  "description": "A modular JavaScript library for generating optimal CSS selectors for DOM elements",
+  "type": "module",
+  "main": "dist/selector-generator.js",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js --watch",
+    "clean": "rm -rf dist"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/selector-generator.js"
+    },
+    "./min": {
+      "import": "./dist/selector-generator.min.js"
+    }
+  },
+  "keywords": [
+    "css",
+    "selector",
+    "dom",
+    "optimization"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.19.0"
+  }
+}
