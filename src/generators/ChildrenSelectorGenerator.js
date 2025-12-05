@@ -85,7 +85,7 @@ export class ChildrenSelectorGenerator {
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
 
-      const localSelectors = this.localGenerator.generate(child);
+      const localSelectors = this.localGenerator.generate([child]);
       for (const childrenLocalSelector of localSelectors) {
         selectors.push({
           cost:
