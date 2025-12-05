@@ -16,11 +16,11 @@ export class BottomUpSelectorOptimizer {
   /**
    * Calculates the value (specificity score) of a selector set.
    * Returns the count of elements matching the selector, or Infinity if invalid.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @param {Array<SelectorDescriptor>} selectorSet - Set of selector descriptors
    * @returns {number} Number of matching elements, or Infinity if invalid
    */
-  getValue(element, selectorSet) {
+  getValue(elements, selectorSet) {
     const selector = this.selectorBuilder.build(selectorSet);
     if (selector === "") {
       return Infinity;
@@ -33,31 +33,36 @@ export class BottomUpSelectorOptimizer {
       return Infinity;
     }
 
-    // Check if element is in results
-    if (!Array.from(results).includes(element)) {
-      console.error(
-        "Element is missing from selector results: ",
-        selector,
-        selectorSet
-      );
-      return Infinity;
+    const resultsArray = Array.from(results);
+
+    // Check if all target elements are in results
+    for (const element of elements) {
+      if (!resultsArray.includes(element)) {
+        console.error(
+          "Element is missing from selector results: ",
+          selector,
+          selectorSet
+        );
+        return Infinity;
+      }
     }
 
     return count;
   }
 
   /**
-   * Finds the best selector set that uniquely identifies an element.
+   * Finds the best selector set that identifies all target elements.
    * Uses a greedy optimization algorithm with decreasing thresholds.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @param {Array<SelectorDescriptor>} selectors - Array of all available selector descriptors
    * @returns {Array<SelectorDescriptor>} Optimized selector set
    */
-  findBest(element, selectors) {
+  findBest(elements, selectors) {
     selectors.sort((a, b) => a.cost - b.cost);
 
     let bestSelectorSet = [];
     let bestValue = Infinity;
+    const targetCount = elements.length;
 
     for (let threshold = 16; threshold >= 1; threshold = threshold / 2) {
       let improving = true;
@@ -80,7 +85,7 @@ export class BottomUpSelectorOptimizer {
           }
 
           trialSelectorSet = [...bestSelectorSet, currentSelector];
-          trialValue = this.getValue(element, trialSelectorSet);
+          trialValue = this.getValue(elements, trialSelectorSet);
 
           if (localBestValue - trialValue >= threshold) {
             localBestValue = trialValue;
@@ -88,7 +93,7 @@ export class BottomUpSelectorOptimizer {
           }
 
           // we found a perfect match
-          if (trialValue === 1) {
+          if (trialValue === targetCount) {
             break;
           }
         }
@@ -96,13 +101,13 @@ export class BottomUpSelectorOptimizer {
         if (bestValue - localBestValue > 0) {
           bestSelectorSet = [...localBestSelectorSet];
           bestValue = localBestValue;
-          if (bestValue === 1) {
+          if (bestValue === targetCount) {
             return bestSelectorSet;
           }
           improving = true;
         }
 
-        if (localBestValue === 1) {
+        if (localBestValue === targetCount) {
           break;
         }
       }

@@ -12,11 +12,9 @@ export class AttributeCollector {
   /**
    * Creates an AttributeCollector instance.
    * @param {HTMLElement|SVGElement} targetElement - The target element to compare against
-   * @param {Array<string>} ignoredAttributes - Attributes to ignore
    */
-  constructor(targetElement, ignoredAttributes = ['class', 'style']) {
+  constructor(targetElement) {
     this.targetElement = targetElement;
-    this.ignoredAttributes = ignoredAttributes;
   }
 
   /**
@@ -91,7 +89,6 @@ export class AttributeCollector {
       for (let j = 0; j < attributes.length; j++) {
         const currentAttr = attributes.item(j);
         if (
-          !this.ignoredAttributes.includes(currentAttr.name) &&
           !this.targetElement.hasAttribute(currentAttr.name) &&
           !extraAttr.includes(currentAttr.name) &&
           !BlacklistMatcher.matches(currentAttr.name, BLACKLIST_ATTRIBUTES)

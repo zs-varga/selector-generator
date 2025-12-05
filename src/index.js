@@ -11,7 +11,7 @@ const SelectorGenerator = (function() {
   const generator = new SelectorGeneratorClass();
 
   return {
-    getSelector: (element) => generator.getSelector(element)
+    getSelector: (elements) => generator.getSelector(elements)
   };
 })();
 

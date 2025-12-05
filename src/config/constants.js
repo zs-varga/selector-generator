@@ -1,11 +1,4 @@
 /**
- * General constants for selector generation.
- */
-
-export const IGNORED_ATTRIBUTES = ["id", "style"];
-export const IGNORED_ATTRIBUTES_FOR_EXCLUSION = ["class", "style"];
-
-/**
  * Blacklist patterns for filtering IDs, classes, and attributes.
  * Supports wildcards: * matches any sequence of characters.
  * Examples:
@@ -26,6 +19,8 @@ export const BLACKLIST_CLASSES = [
 ];
 
 export const BLACKLIST_ATTRIBUTES = [
+  "id",
+  "style",
   "*-ng-*", // Angular generated classes
   "ng-*", // Angular directives
   "*tw-*",

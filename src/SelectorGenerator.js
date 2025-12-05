@@ -43,36 +43,55 @@ export class SelectorGenerator {
   }
 
   /**
-   * Generates an optimal CSS selector for the given element.
-   * Uses a hybrid approach: tries bottom-up optimization first,
-   * and falls back to top-down if a unique selector is not found.
-   * @param {HTMLElement|SVGElement} element - The target element
-   * @returns {string} CSS selector string that uniquely identifies the element
+   * Generates an optimal CSS selector for the given element(s).
+   * For a single element, generates a unique selector matching only that element.
+   * For multiple elements, generates a selector matching all of them (and only them).
+   * @param {HTMLElement|SVGElement|Array<HTMLElement|SVGElement>} elements - The target element(s)
+   * @returns {string} CSS selector string that uniquely identifies the element(s)
+   * @throws {Error} If elements don't share the same parent or invalid element type
    */
-  getSelector(element) {
-    ElementValidator.assertValid(element);
+  getSelector(elements) {
+    // Handle both single element and array of elements
+    const normalizedElements = Array.isArray(elements) ? elements : [elements];
+
+    // Validate all elements
+    for (const element of normalizedElements) {
+      ElementValidator.assertValid(element);
+    }
+
+    // For multiple elements, verify they share the same parent
+    if (normalizedElements.length > 1) {
+      const firstParent = normalizedElements[0].parentElement;
+      for (let i = 1; i < normalizedElements.length; i++) {
+        if (normalizedElements[i].parentElement !== firstParent) {
+          throw new Error(
+            "All elements must share the same parent for multi-element selector generation"
+          );
+        }
+      }
+    }
 
     let selectors = [];
 
-    selectors = selectors.concat(this.localGenerator.generate(element));
-    selectors = selectors.concat(this.exclusionGenerator.generate(element));
-    selectors = selectors.concat(this.childrenGenerator.generate(element));
-    selectors = selectors.concat(this.siblingGenerator.generate(element));
-    selectors = selectors.concat(this.parentGenerator.generate(element));
-    selectors = selectors.concat(this.childrenExclusionGenerator.generate(element));
+    selectors = selectors.concat(this.localGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.exclusionGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.childrenGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.siblingGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.parentGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.childrenExclusionGenerator.generate(normalizedElements));
 
     /*
     // Try bottom-up optimization first (fast, works for most cases)
-    let bestSelectorSet = this.bottomUpOptimizer.findBest(element, selectors);
-    let value = this.bottomUpOptimizer.getValue(element, bestSelectorSet);
+    let bestSelectorSet = this.bottomUpOptimizer.findBest(normalizedElements, selectors);
+    let value = this.bottomUpOptimizer.getValue(normalizedElements, bestSelectorSet);
 
     // If bottom-up didn't find a unique selector, try top-down
-    if (value !== 1) {
-      bestSelectorSet = this.topDownOptimizer.findBest(element, selectors);
+    if (value !== normalizedElements.length) {
+      bestSelectorSet = this.topDownOptimizer.findBest(normalizedElements, selectors);
     }
     */
 
-    let bestSelectorSet = this.topDownOptimizer.findBest(element, selectors);
+    let bestSelectorSet = this.topDownOptimizer.findBest(normalizedElements, selectors);
 
     const selector = this.selectorBuilder.build(bestSelectorSet);
 

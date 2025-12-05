@@ -121,16 +121,37 @@ export class ChildrenSelectorGenerator {
   }
 
   /**
-   * Generates children selectors for an element.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * Generates children selectors for elements.
+   * Returns only selectors that are common to all target elements.
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @returns {Array<SelectorDescriptor>} Array of selector descriptors
    */
-  generate(element) {
-    ElementValidator.assertValid(element);
+  generate(elements) {
+    for (const element of elements) {
+      ElementValidator.assertValid(element);
+    }
 
     const selectors = [];
 
-    this.#processChildren(element, 0, selectors);
+    // Generate children selectors for each element
+    const elementSelectors = elements.map(element => {
+      const sels = [];
+      this.#processChildren(element, 0, sels);
+      return sels;
+    });
+
+    // Find common selectors across all elements
+    if (elementSelectors.length === 0) return selectors;
+
+    const firstSet = elementSelectors[0];
+    for (const descriptor of firstSet) {
+      const isCommon = elementSelectors.every(set =>
+        set.some(d => d.selector === descriptor.selector)
+      );
+      if (isCommon) {
+        selectors.push(descriptor);
+      }
+    }
 
     return selectors;
   }

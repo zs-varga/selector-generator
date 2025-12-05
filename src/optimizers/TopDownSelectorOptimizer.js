@@ -19,11 +19,11 @@ export class TopDownSelectorOptimizer {
   /**
    * Calculates the value (specificity score) of a selector set.
    * Considers both the count of elements matching the selector and the sum of costs.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @param {Array<SelectorDescriptor>} selectorSet - Set of selector descriptors
    * @returns {{count: number, quality: number}} Object with count and quality, or null if invalid
    */
-  getValue(element, selectorSet) {
+  getValue(elements, selectorSet) {
     const selector = this.selectorBuilder.build(selectorSet);
     if (selector === "") {
       return null;
@@ -35,14 +35,18 @@ export class TopDownSelectorOptimizer {
       return null;
     }
 
-    // Check if element is in results
-    if (!Array.from(results).includes(element)) {
-      console.error(
-        "Element is missing from selector results: ",
-        selector,
-        selectorSet
-      );
-      return null;
+    const resultsArray = Array.from(results);
+
+    // Check if all target elements are in results
+    for (const element of elements) {
+      if (!resultsArray.includes(element)) {
+        console.error(
+          "Element is missing from selector results: ",
+          selector,
+          selectorSet
+        );
+        return null;
+      }
     }
 
     // Calculate sum of costs in the selector set
@@ -56,22 +60,24 @@ export class TopDownSelectorOptimizer {
   /**
    * Finds the best selector set using top-down optimization with local best solution.
    * Starts with all selectors and iteratively removes selectors (sorted by cost),
-   * stopping at the first removal that maintains uniqueness (count = 1).
-   * @param {HTMLElement|SVGElement} element - The target element
+   * stopping at the first removal that maintains uniqueness (count = elements.length).
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @param {Array<SelectorDescriptor>} selectors - Array of all available selector descriptors
    * @returns {Array<SelectorDescriptor>} Optimized selector set
    */
-  findBest(element, selectors) {
+  findBest(elements, selectors) {
     // Start with all selectors
     let currentSet = [...selectors];
-    let currentValue = this.getValue(element, currentSet);
+    let currentValue = this.getValue(elements, currentSet);
+
+    const targetCount = elements.length;
 
     // If not unique even with all selectors, use debug optimizer to find minimal non-matching set
-    if (!currentValue || currentValue.count !== 1) {
+    if (!currentValue || currentValue.count !== targetCount) {
       console.warn(
-        "Top-down optimizer: All selectors combined do not produce a unique selector. Finding minimal non-matching subset for debugging."
+        `Top-down optimizer: All selectors combined do not produce a selector matching exactly ${targetCount} element(s). Finding minimal non-matching subset for debugging.`
       );
-      const minimalNonMatching = this.debugOptimizer.findMinimalNonMatchingSet(element, currentSet);
+      const minimalNonMatching = this.debugOptimizer.findMinimalNonMatchingSet(elements[0], currentSet);
       console.log(
         "The problematic selector is this:",
         minimalNonMatching,
@@ -102,11 +108,11 @@ export class TopDownSelectorOptimizer {
         }
 
         const trialSet = currentSet.filter(s => s !== selectorToRemove);
-        const trialValue = this.getValue(element, trialSet);
+        const trialValue = this.getValue(elements, trialSet);
 
-        // Check if element still remains unique (count = 1)
-        if (trialValue && trialValue.count === 1) {
-          // Still unique after removal, commit this change and continue
+        // Check if elements still match exactly (count = targetCount)
+        if (trialValue && trialValue.count === targetCount) {
+          // Still matching after removal, commit this change and continue
           currentSet = trialSet;
           currentValue = trialValue;
           improved = true;

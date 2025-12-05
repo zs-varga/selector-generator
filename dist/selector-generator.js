@@ -140,11 +140,11 @@ var BottomUpSelectorOptimizer = class {
   /**
    * Calculates the value (specificity score) of a selector set.
    * Returns the count of elements matching the selector, or Infinity if invalid.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @param {Array<SelectorDescriptor>} selectorSet - Set of selector descriptors
    * @returns {number} Number of matching elements, or Infinity if invalid
    */
-  getValue(element, selectorSet) {
+  getValue(elements, selectorSet) {
     const selector = this.selectorBuilder.build(selectorSet);
     if (selector === "") {
       return Infinity;
@@ -155,27 +155,31 @@ var BottomUpSelectorOptimizer = class {
       console.error("Empty selector: ", selector, selectorSet);
       return Infinity;
     }
-    if (!Array.from(results).includes(element)) {
-      console.error(
-        "Element is missing from selector results: ",
-        selector,
-        selectorSet
-      );
-      return Infinity;
+    const resultsArray = Array.from(results);
+    for (const element of elements) {
+      if (!resultsArray.includes(element)) {
+        console.error(
+          "Element is missing from selector results: ",
+          selector,
+          selectorSet
+        );
+        return Infinity;
+      }
     }
     return count;
   }
   /**
-   * Finds the best selector set that uniquely identifies an element.
+   * Finds the best selector set that identifies all target elements.
    * Uses a greedy optimization algorithm with decreasing thresholds.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @param {Array<SelectorDescriptor>} selectors - Array of all available selector descriptors
    * @returns {Array<SelectorDescriptor>} Optimized selector set
    */
-  findBest(element, selectors) {
+  findBest(elements, selectors) {
     selectors.sort((a, b) => a.cost - b.cost);
     let bestSelectorSet = [];
     let bestValue = Infinity;
+    const targetCount = elements.length;
     for (let threshold = 16; threshold >= 1; threshold = threshold / 2) {
       let improving = true;
       while (improving) {
@@ -192,24 +196,24 @@ var BottomUpSelectorOptimizer = class {
             continue;
           }
           trialSelectorSet = [...bestSelectorSet, currentSelector];
-          trialValue = this.getValue(element, trialSelectorSet);
+          trialValue = this.getValue(elements, trialSelectorSet);
           if (localBestValue - trialValue >= threshold) {
             localBestValue = trialValue;
             localBestSelectorSet = [...trialSelectorSet];
           }
-          if (trialValue === 1) {
+          if (trialValue === targetCount) {
             break;
           }
         }
         if (bestValue - localBestValue > 0) {
           bestSelectorSet = [...localBestSelectorSet];
           bestValue = localBestValue;
-          if (bestValue === 1) {
+          if (bestValue === targetCount) {
             return bestSelectorSet;
           }
           improving = true;
         }
-        if (localBestValue === 1) {
+        if (localBestValue === targetCount) {
           break;
         }
       }
@@ -277,11 +281,11 @@ var TopDownSelectorOptimizer = class {
   /**
    * Calculates the value (specificity score) of a selector set.
    * Considers both the count of elements matching the selector and the sum of costs.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @param {Array<SelectorDescriptor>} selectorSet - Set of selector descriptors
    * @returns {{count: number, quality: number}} Object with count and quality, or null if invalid
    */
-  getValue(element, selectorSet) {
+  getValue(elements, selectorSet) {
     const selector = this.selectorBuilder.build(selectorSet);
     if (selector === "") {
       return null;
@@ -291,13 +295,16 @@ var TopDownSelectorOptimizer = class {
     if (count === 0) {
       return null;
     }
-    if (!Array.from(results).includes(element)) {
-      console.error(
-        "Element is missing from selector results: ",
-        selector,
-        selectorSet
-      );
-      return null;
+    const resultsArray = Array.from(results);
+    for (const element of elements) {
+      if (!resultsArray.includes(element)) {
+        console.error(
+          "Element is missing from selector results: ",
+          selector,
+          selectorSet
+        );
+        return null;
+      }
     }
     const cost = selectorSet.reduce((sum, descriptor) => sum + descriptor.cost, 0);
     return { count, cost };
@@ -305,19 +312,20 @@ var TopDownSelectorOptimizer = class {
   /**
    * Finds the best selector set using top-down optimization with local best solution.
    * Starts with all selectors and iteratively removes selectors (sorted by cost),
-   * stopping at the first removal that maintains uniqueness (count = 1).
-   * @param {HTMLElement|SVGElement} element - The target element
+   * stopping at the first removal that maintains uniqueness (count = elements.length).
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @param {Array<SelectorDescriptor>} selectors - Array of all available selector descriptors
    * @returns {Array<SelectorDescriptor>} Optimized selector set
    */
-  findBest(element, selectors) {
+  findBest(elements, selectors) {
     let currentSet = [...selectors];
-    let currentValue = this.getValue(element, currentSet);
-    if (!currentValue || currentValue.count !== 1) {
+    let currentValue = this.getValue(elements, currentSet);
+    const targetCount = elements.length;
+    if (!currentValue || currentValue.count !== targetCount) {
       console.warn(
-        "Top-down optimizer: All selectors combined do not produce a unique selector. Finding minimal non-matching subset for debugging."
+        `Top-down optimizer: All selectors combined do not produce a selector matching exactly ${targetCount} element(s). Finding minimal non-matching subset for debugging.`
       );
-      const minimalNonMatching = this.debugOptimizer.findMinimalNonMatchingSet(element, currentSet);
+      const minimalNonMatching = this.debugOptimizer.findMinimalNonMatchingSet(elements[0], currentSet);
       console.log(
         "The problematic selector is this:",
         minimalNonMatching,
@@ -337,8 +345,8 @@ var TopDownSelectorOptimizer = class {
           continue;
         }
         const trialSet = currentSet.filter((s) => s !== selectorToRemove);
-        const trialValue = this.getValue(element, trialSet);
-        if (trialValue && trialValue.count === 1) {
+        const trialValue = this.getValue(elements, trialSet);
+        if (trialValue && trialValue.count === targetCount) {
           currentSet = trialSet;
           currentValue = trialValue;
           improved = true;
@@ -363,8 +371,6 @@ var COST_IS_HAS = 5;
 var COST_NOT = 10;
 
 // src/config/constants.js
-var IGNORED_ATTRIBUTES = ["id", "style"];
-var IGNORED_ATTRIBUTES_FOR_EXCLUSION = ["class", "style"];
 var BLACKLIST_IDS = [
   "*lottie*",
   "selector-generator"
@@ -378,6 +384,8 @@ var BLACKLIST_CLASSES = [
   "*[*px]*"
 ];
 var BLACKLIST_ATTRIBUTES = [
+  "id",
+  "style",
   "*-ng-*",
   // Angular generated classes
   "ng-*",
@@ -440,52 +448,67 @@ __privateAdd(BlacklistMatcher, _patternToRegex);
 // src/generators/LocalSelectorGenerator.js
 var LocalSelectorGenerator = class {
   /**
-   * Generates local selectors for an element.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * Generates local selectors for elements.
+   * Returns only selectors that are common to all target elements.
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @returns {Array<SelectorDescriptor>} Array of selector descriptors
    */
-  generate(element) {
-    ElementValidator.assertValid(element);
-    const selectors = [];
-    if (element.id !== "" && !BlacklistMatcher.matches(element.id, BLACKLIST_IDS)) {
-      selectors.push({
-        cost: COST_ID,
-        level: 0,
-        type: "id",
-        selector: "#" + CSS.escape(element.id)
-      });
+  generate(elements) {
+    for (const element of elements) {
+      ElementValidator.assertValid(element);
     }
-    selectors.push({
-      cost: COST_TAG,
-      level: 0,
-      type: "tag",
-      selector: element.localName
-    });
-    for (let i = 0, attributes = element.attributes; i < attributes.length; i++) {
-      const name = attributes.item(i).name;
-      if (IGNORED_ATTRIBUTES.includes(name)) {
-        continue;
-      }
-      if (name === "class") {
-        element.classList.forEach((currentClass) => {
-          if (!BlacklistMatcher.matches(currentClass, BLACKLIST_CLASSES)) {
-            selectors.push({
-              cost: COST_CLASS,
-              level: 0,
-              type: "class",
-              selector: "." + CSS.escape(currentClass)
-            });
-          }
-        });
-        continue;
-      }
-      if (!BlacklistMatcher.matches(name, BLACKLIST_ATTRIBUTES)) {
-        selectors.push({
-          cost: COST_ATTR,
+    const selectors = [];
+    const elementSelectors = elements.map((element) => {
+      const sels = [];
+      if (element.id !== "" && !BlacklistMatcher.matches(element.id, BLACKLIST_IDS)) {
+        sels.push({
+          cost: COST_ID,
           level: 0,
-          type: "attr",
-          selector: "[" + CSS.escape(name) + "]"
+          type: "id",
+          selector: "#" + CSS.escape(element.id)
         });
+      }
+      sels.push({
+        cost: COST_TAG,
+        level: 0,
+        type: "tag",
+        selector: element.localName
+      });
+      for (let i = 0, attributes = element.attributes; i < attributes.length; i++) {
+        const name = attributes.item(i).name;
+        if (name === "class") {
+          element.classList.forEach((currentClass) => {
+            if (!BlacklistMatcher.matches(currentClass, BLACKLIST_CLASSES)) {
+              sels.push({
+                cost: COST_CLASS,
+                level: 0,
+                type: "class",
+                selector: "." + CSS.escape(currentClass)
+              });
+            }
+          });
+          continue;
+        }
+        if (!BlacklistMatcher.matches(name, BLACKLIST_ATTRIBUTES)) {
+          sels.push({
+            cost: COST_ATTR,
+            level: 0,
+            type: "attr",
+            selector: "[" + CSS.escape(name) + "]"
+          });
+        }
+      }
+      return sels;
+    });
+    if (elementSelectors.length === 0)
+      return selectors;
+    const firstSet = elementSelectors[0];
+    for (const descriptor of firstSet) {
+      const isCommon = elementSelectors.every(
+        (set) => set.some((d) => d.selector === descriptor.selector)
+      );
+      if (isCommon) {
+        selectors.push(descriptor);
       }
     }
     return selectors;
@@ -497,11 +520,9 @@ var AttributeCollector = class {
   /**
    * Creates an AttributeCollector instance.
    * @param {HTMLElement|SVGElement} targetElement - The target element to compare against
-   * @param {Array<string>} ignoredAttributes - Attributes to ignore
    */
-  constructor(targetElement, ignoredAttributes = ["class", "style"]) {
+  constructor(targetElement) {
     this.targetElement = targetElement;
-    this.ignoredAttributes = ignoredAttributes;
   }
   /**
    * Collects extra IDs from elements that the target doesn't have.
@@ -557,7 +578,7 @@ var AttributeCollector = class {
       const attributes = currentElement.attributes;
       for (let j = 0; j < attributes.length; j++) {
         const currentAttr = attributes.item(j);
-        if (!this.ignoredAttributes.includes(currentAttr.name) && !this.targetElement.hasAttribute(currentAttr.name) && !extraAttr.includes(currentAttr.name) && !BlacklistMatcher.matches(currentAttr.name, BLACKLIST_ATTRIBUTES)) {
+        if (!this.targetElement.hasAttribute(currentAttr.name) && !extraAttr.includes(currentAttr.name) && !BlacklistMatcher.matches(currentAttr.name, BLACKLIST_ATTRIBUTES)) {
           extraAttr.push(CSS.escape(currentAttr.name));
         }
       }
@@ -592,44 +613,59 @@ var LocalExclusionGenerator = class {
     this.selectorBuilder = selectorBuilder;
   }
   /**
-   * Generates exclusion selectors for an element.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * Generates exclusion selectors for elements.
+   * Returns only selectors that are common to all target elements.
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @returns {Array<SelectorDescriptor>} Array of selector descriptors
    */
-  generate(element) {
-    ElementValidator.assertValid(element);
-    const localSelectors = this.localGenerator.generate(element);
-    const baseSelector = this.selectorBuilder.build(localSelectors);
-    const elements = this.domService.querySelectorAll(baseSelector);
+  generate(elements) {
+    for (const element of elements) {
+      ElementValidator.assertValid(element);
+    }
     const selectors = [];
-    const collector = new AttributeCollector(
-      element,
-      IGNORED_ATTRIBUTES_FOR_EXCLUSION
-    );
-    const { extraIds, extraClasses, extraAttributes } = collector.collectAll(elements);
-    for (let i = 0; i < extraIds.length; i++) {
-      selectors.push({
-        cost: COST_NOT + COST_ID,
-        level: 0,
-        type: "pseudo",
-        selector: ":not(#" + extraIds[i] + ")"
-      });
-    }
-    for (let i = 0; i < extraClasses.length; i++) {
-      selectors.push({
-        cost: COST_NOT + COST_CLASS,
-        level: 0,
-        type: "pseudo",
-        selector: ":not(." + extraClasses[i] + ")"
-      });
-    }
-    for (let i = 0; i < extraAttributes.length; i++) {
-      selectors.push({
-        cost: COST_NOT + COST_ATTR,
-        level: 0,
-        type: "pseudo",
-        selector: ":not([" + extraAttributes[i] + "])"
-      });
+    const elementExclusions = elements.map((element) => {
+      const localSelectors = this.localGenerator.generate([element]);
+      const baseSelector = this.selectorBuilder.build(localSelectors);
+      const matchedElements = this.domService.querySelectorAll(baseSelector);
+      const exclSelectors = [];
+      const collector = new AttributeCollector(element);
+      const { extraIds, extraClasses, extraAttributes } = collector.collectAll(matchedElements);
+      for (let i = 0; i < extraIds.length; i++) {
+        exclSelectors.push({
+          cost: COST_NOT + COST_ID,
+          level: 0,
+          type: "pseudo",
+          selector: ":not(#" + extraIds[i] + ")"
+        });
+      }
+      for (let i = 0; i < extraClasses.length; i++) {
+        exclSelectors.push({
+          cost: COST_NOT + COST_CLASS,
+          level: 0,
+          type: "pseudo",
+          selector: ":not(." + extraClasses[i] + ")"
+        });
+      }
+      for (let i = 0; i < extraAttributes.length; i++) {
+        exclSelectors.push({
+          cost: COST_NOT + COST_ATTR,
+          level: 0,
+          type: "pseudo",
+          selector: ":not([" + extraAttributes[i] + "])"
+        });
+      }
+      return exclSelectors;
+    });
+    if (elementExclusions.length === 0)
+      return selectors;
+    const firstSet = elementExclusions[0];
+    for (const descriptor of firstSet) {
+      const isCommon = elementExclusions.every(
+        (set) => set.some((d) => d.selector === descriptor.selector)
+      );
+      if (isCommon) {
+        selectors.push(descriptor);
+      }
     }
     return selectors;
   }
@@ -654,14 +690,32 @@ var ChildrenSelectorGenerator = class {
     this.localGenerator = localGenerator;
   }
   /**
-   * Generates children selectors for an element.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * Generates children selectors for elements.
+   * Returns only selectors that are common to all target elements.
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @returns {Array<SelectorDescriptor>} Array of selector descriptors
    */
-  generate(element) {
-    ElementValidator.assertValid(element);
+  generate(elements) {
+    for (const element of elements) {
+      ElementValidator.assertValid(element);
+    }
     const selectors = [];
-    __privateMethod(this, _processChildren, processChildren_fn).call(this, element, 0, selectors);
+    const elementSelectors = elements.map((element) => {
+      const sels = [];
+      __privateMethod(this, _processChildren, processChildren_fn).call(this, element, 0, sels);
+      return sels;
+    });
+    if (elementSelectors.length === 0)
+      return selectors;
+    const firstSet = elementSelectors[0];
+    for (const descriptor of firstSet) {
+      const isCommon = elementSelectors.every(
+        (set) => set.some((d) => d.selector === descriptor.selector)
+      );
+      if (isCommon) {
+        selectors.push(descriptor);
+      }
+    }
     return selectors;
   }
 };
@@ -748,60 +802,78 @@ var ChildrenExclusionGenerator = class {
     this.selectorBuilder = selectorBuilder;
   }
   /**
-   * Generates children exclusion selectors for an element.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * Generates children exclusion selectors for elements.
+   * Returns only selectors that are common to all target elements.
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @returns {Array<SelectorDescriptor>} Array of selector descriptors
    */
-  generate(element) {
-    ElementValidator.assertValid(element);
-    const elementSelector = this.localGenerator.generate(element);
-    const childrenSelector = this.selectorBuilder.build(elementSelector) + " *";
-    const allChildren = this.domService.querySelectorAll(childrenSelector);
+  generate(elements) {
+    for (const element of elements) {
+      ElementValidator.assertValid(element);
+    }
     const selectors = [];
-    const extraClasses = [];
-    const extraAttr = [];
-    for (let i = 0; i < allChildren.length; i++) {
-      const currentChild = allChildren[i];
-      if (element.contains(currentChild)) {
-        continue;
+    const elementSelectors = elements.map((element) => {
+      const sels = [];
+      const elementSelector = this.localGenerator.generate([element]);
+      const childrenSelector = this.selectorBuilder.build(elementSelector) + " *";
+      const allChildren = this.domService.querySelectorAll(childrenSelector);
+      const extraClasses = [];
+      const extraAttr = [];
+      for (let i = 0; i < allChildren.length; i++) {
+        const currentChild = allChildren[i];
+        if (element.contains(currentChild)) {
+          continue;
+        }
+        const id = currentChild.getAttribute("id");
+        if (id !== null && !BlacklistMatcher.matches(id, BLACKLIST_IDS)) {
+          sels.push({
+            cost: COST_NOT + COST_IS_HAS + COST_CHILDREN + COST_ID,
+            level: 0,
+            type: "pseudo",
+            selector: ":not(:has(#" + CSS.escape(id) + "))"
+          });
+        }
+        currentChild.classList.forEach((currentClass) => {
+          if (!element.querySelector("." + CSS.escape(currentClass)) && !extraClasses.includes(currentClass) && !BlacklistMatcher.matches(currentClass, BLACKLIST_CLASSES)) {
+            extraClasses.push(CSS.escape(currentClass));
+          }
+        });
+        const attributes = currentChild.attributes;
+        for (let j = 0; j < attributes.length; j++) {
+          const currentAttr = attributes.item(j);
+          if (!element.querySelector("[" + CSS.escape(currentAttr.name) + "]") && !extraAttr.includes(currentAttr.name) && !BlacklistMatcher.matches(currentAttr.name, BLACKLIST_ATTRIBUTES)) {
+            extraAttr.push(CSS.escape(currentAttr.name));
+          }
+        }
       }
-      const id = currentChild.getAttribute("id");
-      if (id !== null && !BlacklistMatcher.matches(id, BLACKLIST_IDS)) {
-        selectors.push({
-          cost: COST_NOT + COST_IS_HAS + COST_CHILDREN + COST_ID,
+      for (let i = 0; i < extraClasses.length; i++) {
+        sels.push({
+          cost: COST_NOT + COST_IS_HAS + COST_CHILDREN + COST_CLASS,
           level: 0,
           type: "pseudo",
-          selector: ":not(:has(#" + CSS.escape(id) + "))"
+          selector: ":not(:has(." + extraClasses[i] + "))"
         });
       }
-      currentChild.classList.forEach((currentClass) => {
-        if (!element.querySelector("." + CSS.escape(currentClass)) && !extraClasses.includes(currentClass) && !BlacklistMatcher.matches(currentClass, BLACKLIST_CLASSES)) {
-          extraClasses.push(CSS.escape(currentClass));
-        }
-      });
-      const attributes = currentChild.attributes;
-      for (let j = 0; j < attributes.length; j++) {
-        const currentAttr = attributes.item(j);
-        if (!IGNORED_ATTRIBUTES_FOR_EXCLUSION.includes(currentAttr.name) && !element.querySelector("[" + CSS.escape(currentAttr.name) + "]") && !extraAttr.includes(currentAttr.name) && !BlacklistMatcher.matches(currentAttr.name, BLACKLIST_ATTRIBUTES)) {
-          extraAttr.push(CSS.escape(currentAttr.name));
-        }
+      for (let i = 0; i < extraAttr.length; i++) {
+        sels.push({
+          cost: COST_NOT + COST_IS_HAS + COST_CHILDREN + COST_ATTR,
+          level: 0,
+          type: "pseudo",
+          selector: ":not(:has([" + extraAttr[i] + "]))"
+        });
       }
-    }
-    for (let i = 0; i < extraClasses.length; i++) {
-      selectors.push({
-        cost: COST_NOT + COST_IS_HAS + COST_CHILDREN + COST_CLASS,
-        level: 0,
-        type: "pseudo",
-        selector: ":not(:has(." + extraClasses[i] + "))"
-      });
-    }
-    for (let i = 0; i < extraAttr.length; i++) {
-      selectors.push({
-        cost: COST_NOT + COST_IS_HAS + COST_CHILDREN + COST_ATTR,
-        level: 0,
-        type: "pseudo",
-        selector: ":not(:has([" + extraAttr[i] + "]))"
-      });
+      return sels;
+    });
+    if (elementSelectors.length === 0)
+      return selectors;
+    const firstSet = elementSelectors[0];
+    for (const descriptor of firstSet) {
+      const isCommon = elementSelectors.every(
+        (set) => set.some((d) => d.selector === descriptor.selector)
+      );
+      if (isCommon) {
+        selectors.push(descriptor);
+      }
     }
     return selectors;
   }
@@ -817,104 +889,122 @@ var SiblingSelectorGenerator = class {
     this.localGenerator = localGenerator;
   }
   /**
-   * Generates sibling selectors for an element.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * Generates sibling selectors for elements.
+   * Returns only selectors that are common to all target elements.
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @returns {Array<SelectorDescriptor>} Array of selector descriptors
    */
-  generate(element) {
-    ElementValidator.assertValid(element);
-    const selectors = [];
-    let prevSibling = element.previousElementSibling;
-    const prevSiblingCount = prevSibling !== null ? Array.from(element.parentElement.children).indexOf(element) : 0;
-    let nextSibling = element.nextElementSibling;
-    const nextSiblingCount = nextSibling !== null ? Array.from(element.parentElement.children).length - Array.from(element.parentElement.children).indexOf(element) : 0;
-    if (prevSibling === null) {
-      selectors.push({
-        cost: (nextSiblingCount + 1) * COST_DISTANCE + COST_SIBLING,
-        level: 0,
-        type: "pseudo",
-        selector: ":first-child"
-      });
-    } else {
-      selectors.push({
-        cost: (prevSiblingCount + 1) * COST_DISTANCE + COST_SIBLING,
-        level: 0,
-        type: "pseudo",
-        selector: ":nth-child(" + (prevSiblingCount + 1) + ")"
-      });
+  generate(elements) {
+    for (const element of elements) {
+      ElementValidator.assertValid(element);
     }
-    if (nextSibling === null) {
-      selectors.push({
-        cost: (prevSiblingCount + 1) * COST_DISTANCE + COST_SIBLING,
-        level: 0,
-        type: "pseudo",
-        selector: ":last-child"
-      });
-    } else {
-      if (prevSiblingCount > 0) {
-        selectors.push({
+    const selectors = [];
+    const elementSelectors = elements.map((element) => {
+      const sels = [];
+      let prevSibling = element.previousElementSibling;
+      const prevSiblingCount = prevSibling !== null ? Array.from(element.parentElement.children).indexOf(element) : 0;
+      let nextSibling = element.nextElementSibling;
+      const nextSiblingCount = nextSibling !== null ? Array.from(element.parentElement.children).length - Array.from(element.parentElement.children).indexOf(element) : 0;
+      if (prevSibling === null) {
+        sels.push({
           cost: (nextSiblingCount + 1) * COST_DISTANCE + COST_SIBLING,
           level: 0,
           type: "pseudo",
-          selector: ":nth-last-child(" + nextSiblingCount + ")"
+          selector: ":first-child"
+        });
+      } else {
+        sels.push({
+          cost: (prevSiblingCount + 1) * COST_DISTANCE + COST_SIBLING,
+          level: 0,
+          type: "pseudo",
+          selector: ":nth-child(" + (prevSiblingCount + 1) + ")"
         });
       }
-    }
-    if (prevSibling === null && nextSibling === null) {
-      selectors.push({
-        cost: COST_SIBLING,
-        level: 0,
-        type: "pseudo",
-        selector: ":only-child"
-      });
-    }
-    while (prevSibling) {
-      if (prevSibling.nodeType === Node.COMMENT_NODE) {
-        prevSibling = prevSibling.previousElementSibling;
-        continue;
-      }
-      if (prevSibling.nodeType === Node.TEXT_NODE) {
-        prevSibling = prevSibling.previousElementSibling;
-        continue;
-      }
-      const localSelectors = this.localGenerator.generate(prevSibling);
-      for (const currentSelector of localSelectors) {
-        if (!selectors.some(
-          (s) => s.selector === ":is(" + currentSelector.selector + " ~ *)"
-        )) {
-          selectors.push({
-            cost: COST_SIBLING + COST_IS_HAS + currentSelector.cost,
+      if (nextSibling === null) {
+        sels.push({
+          cost: (prevSiblingCount + 1) * COST_DISTANCE + COST_SIBLING,
+          level: 0,
+          type: "pseudo",
+          selector: ":last-child"
+        });
+      } else {
+        if (prevSiblingCount > 0) {
+          sels.push({
+            cost: (nextSiblingCount + 1) * COST_DISTANCE + COST_SIBLING,
             level: 0,
             type: "pseudo",
-            selector: ":is(" + currentSelector.selector + " ~ *)"
+            selector: ":nth-last-child(" + nextSiblingCount + ")"
           });
         }
       }
-      prevSibling = prevSibling.previousElementSibling;
-    }
-    while (nextSibling) {
-      if (nextSibling.nodeType === Node.COMMENT_NODE) {
-        nextSibling = nextSibling.nextElementSibling;
-        continue;
+      if (prevSibling === null && nextSibling === null) {
+        sels.push({
+          cost: COST_SIBLING,
+          level: 0,
+          type: "pseudo",
+          selector: ":only-child"
+        });
       }
-      if (nextSibling.nodeType === Node.TEXT_NODE) {
-        nextSibling = nextSibling.nextElementSibling;
-        continue;
-      }
-      const localSelectors = this.localGenerator.generate(nextSibling);
-      for (const currentSelector of localSelectors) {
-        if (!selectors.some(
-          (s) => s.selector === ":has(~ " + currentSelector.selector + ")"
-        )) {
-          selectors.push({
-            cost: COST_SIBLING + COST_IS_HAS + currentSelector.cost,
-            level: 0,
-            type: "pseudo",
-            selector: ":has(~ " + currentSelector.selector + ")"
-          });
+      while (prevSibling) {
+        if (prevSibling.nodeType === Node.COMMENT_NODE) {
+          prevSibling = prevSibling.previousElementSibling;
+          continue;
         }
+        if (prevSibling.nodeType === Node.TEXT_NODE) {
+          prevSibling = prevSibling.previousElementSibling;
+          continue;
+        }
+        const localSelectors = this.localGenerator.generate([prevSibling]);
+        for (const currentSelector of localSelectors) {
+          if (!sels.some(
+            (s) => s.selector === ":is(" + currentSelector.selector + " ~ *)"
+          )) {
+            sels.push({
+              cost: COST_SIBLING + COST_IS_HAS + currentSelector.cost,
+              level: 0,
+              type: "pseudo",
+              selector: ":is(" + currentSelector.selector + " ~ *)"
+            });
+          }
+        }
+        prevSibling = prevSibling.previousElementSibling;
       }
-      nextSibling = nextSibling.nextElementSibling;
+      while (nextSibling) {
+        if (nextSibling.nodeType === Node.COMMENT_NODE) {
+          nextSibling = nextSibling.nextElementSibling;
+          continue;
+        }
+        if (nextSibling.nodeType === Node.TEXT_NODE) {
+          nextSibling = nextSibling.nextElementSibling;
+          continue;
+        }
+        const localSelectors = this.localGenerator.generate([nextSibling]);
+        for (const currentSelector of localSelectors) {
+          if (!sels.some(
+            (s) => s.selector === ":has(~ " + currentSelector.selector + ")"
+          )) {
+            sels.push({
+              cost: COST_SIBLING + COST_IS_HAS + currentSelector.cost,
+              level: 0,
+              type: "pseudo",
+              selector: ":has(~ " + currentSelector.selector + ")"
+            });
+          }
+        }
+        nextSibling = nextSibling.nextElementSibling;
+      }
+      return sels;
+    });
+    if (elementSelectors.length === 0)
+      return selectors;
+    const firstSet = elementSelectors[0];
+    for (const descriptor of firstSet) {
+      const isCommon = elementSelectors.every(
+        (set) => set.some((d) => d.selector === descriptor.selector)
+      );
+      if (isCommon) {
+        selectors.push(descriptor);
+      }
     }
     return selectors;
   }
@@ -934,45 +1024,63 @@ var ParentSelectorGenerator = class {
     this.siblingGenerator = siblingGenerator;
   }
   /**
-   * Generates parent selectors for an element.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * Generates parent selectors for elements.
+   * Returns only selectors that are common to all target elements.
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @returns {Array<SelectorDescriptor>} Array of selector descriptors
    */
-  generate(element) {
-    ElementValidator.assertValid(element);
+  generate(elements) {
+    for (const element of elements) {
+      ElementValidator.assertValid(element);
+    }
     const selectors = [];
-    let currentParent = element.parentElement;
-    let level = 1;
-    while (currentParent) {
-      const localSelectors = this.localGenerator.generate(currentParent);
-      for (const currentSelector of localSelectors) {
-        selectors.push({
-          cost: level * COST_DISTANCE + COST_PARENT + currentSelector.cost,
-          level,
-          type: currentSelector.type,
-          selector: currentSelector.selector
-        });
+    const elementSelectors = elements.map((element) => {
+      const sels = [];
+      let currentParent = element.parentElement;
+      let level = 1;
+      while (currentParent) {
+        const localSelectors = this.localGenerator.generate([currentParent]);
+        for (const currentSelector of localSelectors) {
+          sels.push({
+            cost: level * COST_DISTANCE + COST_PARENT + currentSelector.cost,
+            level,
+            type: currentSelector.type,
+            selector: currentSelector.selector
+          });
+        }
+        const localExclSelectors = this.exclusionGenerator.generate([currentParent]);
+        for (const currentSelector of localExclSelectors) {
+          sels.push({
+            cost: level * COST_DISTANCE + COST_PARENT + currentSelector.cost,
+            level,
+            type: currentSelector.type,
+            selector: currentSelector.selector
+          });
+        }
+        const siblingSelectors = this.siblingGenerator.generate([currentParent]);
+        for (const currentSelector of siblingSelectors) {
+          sels.push({
+            cost: level * COST_DISTANCE + COST_PARENT + currentSelector.cost,
+            level,
+            type: currentSelector.type,
+            selector: currentSelector.selector
+          });
+        }
+        currentParent = currentParent.parentElement;
+        level = level + 1;
       }
-      const localExclSelectors = this.exclusionGenerator.generate(currentParent);
-      for (const currentSelector of localExclSelectors) {
-        selectors.push({
-          cost: level * COST_DISTANCE + COST_PARENT + currentSelector.cost,
-          level,
-          type: currentSelector.type,
-          selector: currentSelector.selector
-        });
+      return sels;
+    });
+    if (elementSelectors.length === 0)
+      return selectors;
+    const firstSet = elementSelectors[0];
+    for (const descriptor of firstSet) {
+      const isCommon = elementSelectors.every(
+        (set) => set.some((d) => d.selector === descriptor.selector)
+      );
+      if (isCommon) {
+        selectors.push(descriptor);
       }
-      const siblingSelectors = this.siblingGenerator.generate(currentParent);
-      for (const currentSelector of siblingSelectors) {
-        selectors.push({
-          cost: level * COST_DISTANCE + COST_PARENT + currentSelector.cost,
-          level,
-          type: currentSelector.type,
-          selector: currentSelector.selector
-        });
-      }
-      currentParent = currentParent.parentElement;
-      level = level + 1;
     }
     return selectors;
   }
@@ -1005,22 +1113,36 @@ var SelectorGenerator = class {
     );
   }
   /**
-   * Generates an optimal CSS selector for the given element.
-   * Uses a hybrid approach: tries bottom-up optimization first,
-   * and falls back to top-down if a unique selector is not found.
-   * @param {HTMLElement|SVGElement} element - The target element
-   * @returns {string} CSS selector string that uniquely identifies the element
+   * Generates an optimal CSS selector for the given element(s).
+   * For a single element, generates a unique selector matching only that element.
+   * For multiple elements, generates a selector matching all of them (and only them).
+   * @param {HTMLElement|SVGElement|Array<HTMLElement|SVGElement>} elements - The target element(s)
+   * @returns {string} CSS selector string that uniquely identifies the element(s)
+   * @throws {Error} If elements don't share the same parent or invalid element type
    */
-  getSelector(element) {
-    ElementValidator.assertValid(element);
+  getSelector(elements) {
+    const normalizedElements = Array.isArray(elements) ? elements : [elements];
+    for (const element of normalizedElements) {
+      ElementValidator.assertValid(element);
+    }
+    if (normalizedElements.length > 1) {
+      const firstParent = normalizedElements[0].parentElement;
+      for (let i = 1; i < normalizedElements.length; i++) {
+        if (normalizedElements[i].parentElement !== firstParent) {
+          throw new Error(
+            "All elements must share the same parent for multi-element selector generation"
+          );
+        }
+      }
+    }
     let selectors = [];
-    selectors = selectors.concat(this.localGenerator.generate(element));
-    selectors = selectors.concat(this.exclusionGenerator.generate(element));
-    selectors = selectors.concat(this.childrenGenerator.generate(element));
-    selectors = selectors.concat(this.siblingGenerator.generate(element));
-    selectors = selectors.concat(this.parentGenerator.generate(element));
-    selectors = selectors.concat(this.childrenExclusionGenerator.generate(element));
-    let bestSelectorSet = this.topDownOptimizer.findBest(element, selectors);
+    selectors = selectors.concat(this.localGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.exclusionGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.childrenGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.siblingGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.parentGenerator.generate(normalizedElements));
+    selectors = selectors.concat(this.childrenExclusionGenerator.generate(normalizedElements));
+    let bestSelectorSet = this.topDownOptimizer.findBest(normalizedElements, selectors);
     const selector = this.selectorBuilder.build(bestSelectorSet);
     return selector;
   }
@@ -1031,7 +1153,7 @@ var SelectorGenerator2 = function() {
   "use strict";
   const generator = new SelectorGenerator();
   return {
-    getSelector: (element) => generator.getSelector(element)
+    getSelector: (elements) => generator.getSelector(elements)
   };
 }();
 if (typeof window !== "undefined") {

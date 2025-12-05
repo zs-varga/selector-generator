@@ -6,7 +6,6 @@ import {
   COST_CLASS,
   COST_ID,
 } from "../config/costs.js";
-import { IGNORED_ATTRIBUTES_FOR_EXCLUSION } from "../config/constants.js";
 
 /**
  * Generates :not() pseudo-selectors to exclude similar elements.
@@ -25,51 +24,71 @@ export class LocalExclusionGenerator {
   }
 
   /**
-   * Generates exclusion selectors for an element.
-   * @param {HTMLElement|SVGElement} element - The target element
+   * Generates exclusion selectors for elements.
+   * Returns only selectors that are common to all target elements.
+   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
    * @returns {Array<SelectorDescriptor>} Array of selector descriptors
    */
-  generate(element) {
-    ElementValidator.assertValid(element);
-
-    const localSelectors = this.localGenerator.generate(element);
-    const baseSelector = this.selectorBuilder.build(localSelectors);
-    const elements = this.domService.querySelectorAll(baseSelector);
+  generate(elements) {
+    for (const element of elements) {
+      ElementValidator.assertValid(element);
+    }
 
     const selectors = [];
-    const collector = new AttributeCollector(
-      element,
-      IGNORED_ATTRIBUTES_FOR_EXCLUSION
-    );
 
-    const { extraIds, extraClasses, extraAttributes } =
-      collector.collectAll(elements);
+    // Generate exclusion selectors for each element
+    const elementExclusions = elements.map(element => {
+      const localSelectors = this.localGenerator.generate([element]);
+      const baseSelector = this.selectorBuilder.build(localSelectors);
+      const matchedElements = this.domService.querySelectorAll(baseSelector);
 
-    for (let i = 0; i < extraIds.length; i++) {
-      selectors.push({
-        cost: COST_NOT + COST_ID,
-        level: 0,
-        type: "pseudo",
-        selector: ":not(#" + extraIds[i] + ")",
-      });
-    }
+      const exclSelectors = [];
+      const collector = new AttributeCollector(element);
 
-    for (let i = 0; i < extraClasses.length; i++) {
-      selectors.push({
-        cost: COST_NOT + COST_CLASS,
-        level: 0,
-        type: "pseudo",
-        selector: ":not(." + extraClasses[i] + ")",
-      });
-    }
+      const { extraIds, extraClasses, extraAttributes } =
+        collector.collectAll(matchedElements);
 
-    for (let i = 0; i < extraAttributes.length; i++) {
-      selectors.push({
-        cost: COST_NOT + COST_ATTR,
-        level: 0,
-        type: "pseudo",
-        selector: ":not([" + extraAttributes[i] + "])",
-      });
+      for (let i = 0; i < extraIds.length; i++) {
+        exclSelectors.push({
+          cost: COST_NOT + COST_ID,
+          level: 0,
+          type: "pseudo",
+          selector: ":not(#" + extraIds[i] + ")",
+        });
+      }
+
+      for (let i = 0; i < extraClasses.length; i++) {
+        exclSelectors.push({
+          cost: COST_NOT + COST_CLASS,
+          level: 0,
+          type: "pseudo",
+          selector: ":not(." + extraClasses[i] + ")",
+        });
+      }
+
+      for (let i = 0; i < extraAttributes.length; i++) {
+        exclSelectors.push({
+          cost: COST_NOT + COST_ATTR,
+          level: 0,
+          type: "pseudo",
+          selector: ":not([" + extraAttributes[i] + "])",
+        });
+      }
+
+      return exclSelectors;
+    });
+
+    // Find common selectors across all elements
+    if (elementExclusions.length === 0) return selectors;
+
+    const firstSet = elementExclusions[0];
+    for (const descriptor of firstSet) {
+      const isCommon = elementExclusions.every(set =>
+        set.some(d => d.selector === descriptor.selector)
+      );
+      if (isCommon) {
+        selectors.push(descriptor);
+      }
     }
 
     return selectors;
