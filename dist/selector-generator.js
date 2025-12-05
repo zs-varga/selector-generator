@@ -1116,9 +1116,10 @@ var SelectorGenerator = class {
    * Generates an optimal CSS selector for the given element(s).
    * For a single element, generates a unique selector matching only that element.
    * For multiple elements, generates a selector matching all of them (and only them).
+   * Elements can be at any level in the DOM tree as long as they share a common ancestor.
    * @param {HTMLElement|SVGElement|Array<HTMLElement|SVGElement>} elements - The target element(s)
    * @returns {string} CSS selector string that uniquely identifies the element(s)
-   * @throws {Error} If elements don't share the same parent or invalid element type
+   * @throws {Error} If elements are invalid or don't share a common ancestor
    */
   getSelector(elements) {
     const normalizedElements = Array.isArray(elements) ? elements : [elements];
@@ -1126,21 +1127,11 @@ var SelectorGenerator = class {
       ElementValidator.assertValid(element);
     }
     if (normalizedElements.length > 1) {
-      const firstParent = normalizedElements[0].parentElement;
+      const firstDoc = normalizedElements[0].ownerDocument;
       for (let i = 1; i < normalizedElements.length; i++) {
-        const currentParent = normalizedElements[i].parentElement;
-        const parentsEqual = currentParent === firstParent;
-        console.log(`[DEBUG] Element ${i} check:`, {
-          currentElement: normalizedElements[i],
-          currentParent,
-          firstParent,
-          areEqual: parentsEqual,
-          currentParentTagName: currentParent?.tagName,
-          firstParentTagName: firstParent?.tagName
-        });
-        if (!parentsEqual) {
+        if (normalizedElements[i].ownerDocument !== firstDoc) {
           throw new Error(
-            `All elements must share the same parent for multi-element selector generation (element ${i} differs)`
+            `All elements must belong to the same document for multi-element selector generation`
           );
         }
       }
