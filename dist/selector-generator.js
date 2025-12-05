@@ -767,7 +767,7 @@ processChildren_fn = function(element, depth, selectors) {
   }
   for (let i = 0; i < children.length; i++) {
     const child = children[i];
-    const localSelectors = this.localGenerator.generate(child);
+    const localSelectors = this.localGenerator.generate([child]);
     for (const childrenLocalSelector of localSelectors) {
       selectors.push({
         cost: depth * COST_DISTANCE + COST_IS_HAS + COST_CHILDREN + childrenLocalSelector.cost,
