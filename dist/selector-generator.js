@@ -1129,8 +1129,14 @@ var SelectorGenerator = class {
       const firstParent = normalizedElements[0].parentElement;
       for (let i = 1; i < normalizedElements.length; i++) {
         if (normalizedElements[i].parentElement !== firstParent) {
+          console.error(
+            `Element at index ${i} has parent:`,
+            normalizedElements[i].parentElement,
+            `but expected:`,
+            firstParent
+          );
           throw new Error(
-            "All elements must share the same parent for multi-element selector generation"
+            `All elements must share the same parent for multi-element selector generation (element ${i} differs)`
           );
         }
       }
