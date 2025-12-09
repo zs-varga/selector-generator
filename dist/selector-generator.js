@@ -505,7 +505,9 @@ var LocalSelectorGenerator = class {
     const firstSet = elementSelectors[0];
     for (const descriptor of firstSet) {
       const isCommon = elementSelectors.every(
-        (set) => set.some((d) => d.selector === descriptor.selector)
+        (set) => set.some(
+          (d) => d.level === descriptor.level && d.type === descriptor.type && d.selector === descriptor.selector
+        )
       );
       if (isCommon) {
         selectors.push(descriptor);
@@ -661,7 +663,9 @@ var LocalExclusionGenerator = class {
     const firstSet = elementExclusions[0];
     for (const descriptor of firstSet) {
       const isCommon = elementExclusions.every(
-        (set) => set.some((d) => d.selector === descriptor.selector)
+        (set) => set.some(
+          (d) => d.level === descriptor.level && d.type === descriptor.type && d.selector === descriptor.selector
+        )
       );
       if (isCommon) {
         selectors.push(descriptor);
@@ -710,7 +714,9 @@ var ChildrenSelectorGenerator = class {
     const firstSet = elementSelectors[0];
     for (const descriptor of firstSet) {
       const isCommon = elementSelectors.every(
-        (set) => set.some((d) => d.selector === descriptor.selector)
+        (set) => set.some(
+          (d) => d.level === descriptor.level && d.type === descriptor.type && d.selector === descriptor.selector
+        )
       );
       if (isCommon) {
         selectors.push(descriptor);
@@ -869,7 +875,9 @@ var ChildrenExclusionGenerator = class {
     const firstSet = elementSelectors[0];
     for (const descriptor of firstSet) {
       const isCommon = elementSelectors.every(
-        (set) => set.some((d) => d.selector === descriptor.selector)
+        (set) => set.some(
+          (d) => d.level === descriptor.level && d.type === descriptor.type && d.selector === descriptor.selector
+        )
       );
       if (isCommon) {
         selectors.push(descriptor);
@@ -1000,7 +1008,9 @@ var SiblingSelectorGenerator = class {
     const firstSet = elementSelectors[0];
     for (const descriptor of firstSet) {
       const isCommon = elementSelectors.every(
-        (set) => set.some((d) => d.selector === descriptor.selector)
+        (set) => set.some(
+          (d) => d.level === descriptor.level && d.type === descriptor.type && d.selector === descriptor.selector
+        )
       );
       if (isCommon) {
         selectors.push(descriptor);
@@ -1076,7 +1086,9 @@ var ParentSelectorGenerator = class {
     const firstSet = elementSelectors[0];
     for (const descriptor of firstSet) {
       const isCommon = elementSelectors.every(
-        (set) => set.some((d) => d.selector === descriptor.selector)
+        (set) => set.some(
+          (d) => d.level === descriptor.level && d.type === descriptor.type && d.selector === descriptor.selector
+        )
       );
       if (isCommon) {
         selectors.push(descriptor);

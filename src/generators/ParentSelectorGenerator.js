@@ -82,7 +82,12 @@ export class ParentSelectorGenerator {
     const firstSet = elementSelectors[0];
     for (const descriptor of firstSet) {
       const isCommon = elementSelectors.every(set =>
-        set.some(d => d.selector === descriptor.selector)
+        set.some(
+          (d) =>
+            d.level === descriptor.level &&
+            d.type === descriptor.type &&
+            d.selector === descriptor.selector
+        )
       );
       if (isCommon) {
         selectors.push(descriptor);

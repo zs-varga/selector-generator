@@ -45,11 +45,12 @@ export class ChildrenExclusionGenerator {
     const selectors = [];
 
     // Generate children exclusion selectors for each element
-    const elementSelectors = elements.map(element => {
+    const elementSelectors = elements.map((element) => {
       const sels = [];
 
       const elementSelector = this.localGenerator.generate([element]);
-      const childrenSelector = this.selectorBuilder.build(elementSelector) + " *";
+      const childrenSelector =
+        this.selectorBuilder.build(elementSelector) + " *";
       const allChildren = this.domService.querySelectorAll(childrenSelector);
 
       const extraClasses = [];
@@ -125,8 +126,13 @@ export class ChildrenExclusionGenerator {
 
     const firstSet = elementSelectors[0];
     for (const descriptor of firstSet) {
-      const isCommon = elementSelectors.every(set =>
-        set.some(d => d.selector === descriptor.selector)
+      const isCommon = elementSelectors.every((set) =>
+        set.some(
+          (d) =>
+            d.level === descriptor.level &&
+            d.type === descriptor.type &&
+            d.selector === descriptor.selector
+        )
       );
       if (isCommon) {
         selectors.push(descriptor);

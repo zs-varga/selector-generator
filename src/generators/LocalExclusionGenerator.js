@@ -84,7 +84,12 @@ export class LocalExclusionGenerator {
     const firstSet = elementExclusions[0];
     for (const descriptor of firstSet) {
       const isCommon = elementExclusions.every(set =>
-        set.some(d => d.selector === descriptor.selector)
+        set.some(
+          (d) =>
+            d.level === descriptor.level &&
+            d.type === descriptor.type &&
+            d.selector === descriptor.selector
+        )
       );
       if (isCommon) {
         selectors.push(descriptor);
