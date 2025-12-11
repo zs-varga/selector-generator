@@ -321,7 +321,8 @@ var TopDownSelectorOptimizer = class {
     const targetCount = targetElements.length;
     let currentSet = [...selectors];
     let currentValue = this.getValue(targetElements, currentSet);
-    if (!currentValue || targetCount === 1 && currentValue.count !== targetCount) {
+    const startingCount = currentValue ? currentValue.count : 0;
+    if (!currentValue || currentValue.count !== startingCount) {
       console.warn(
         `Top-down optimizer: All selectors combined do not produce a selector matching exactly ${targetCount} element(s). Finding minimal non-matching subset for debugging.`
       );
@@ -346,7 +347,7 @@ var TopDownSelectorOptimizer = class {
         }
         const trialSet = currentSet.filter((s) => s !== selectorToRemove);
         const trialValue = this.getValue(targetElements, trialSet);
-        if (trialValue && trialValue.count === targetCount) {
+        if (trialValue && trialValue.count === startingCount) {
           currentSet = trialSet;
           currentValue = trialValue;
           improved = true;
