@@ -73,6 +73,13 @@ export class TopDownSelectorOptimizer {
     let currentValue = this.getValue(targetElements, currentSet);
     const startingCount = currentValue ? currentValue.count : 0;
 
+    if (startingCount < targetCount) {
+      console.warn(
+        `Top-down optimizer: Initial selector set does not match all target elements. Expected ${targetCount}, got ${startingCount}.`
+      );
+      return currentSet;
+    }
+
     // If not unique even with all selectors, use debug optimizer to find minimal non-matching set
     // Only if we are finding a selector for a single element
     if (!currentValue || currentValue.count !== startingCount) {

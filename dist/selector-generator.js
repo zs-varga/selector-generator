@@ -322,6 +322,12 @@ var TopDownSelectorOptimizer = class {
     let currentSet = [...selectors];
     let currentValue = this.getValue(targetElements, currentSet);
     const startingCount = currentValue ? currentValue.count : 0;
+    if (startingCount < targetCount) {
+      console.warn(
+        `Top-down optimizer: Initial selector set does not match all target elements. Expected ${targetCount}, got ${startingCount}.`
+      );
+      return currentSet;
+    }
     if (!currentValue || currentValue.count !== startingCount) {
       console.warn(
         `Top-down optimizer: All selectors combined do not produce a selector matching exactly ${targetCount} element(s). Finding minimal non-matching subset for debugging.`
