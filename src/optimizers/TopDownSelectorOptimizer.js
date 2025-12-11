@@ -51,7 +51,10 @@ export class TopDownSelectorOptimizer {
 
     // Calculate sum of costs in the selector set
     // Lower cost sum = better quality
-    const cost = selectorSet.reduce((sum, descriptor) => sum + descriptor.cost, 0);
+    let cost = selectorSet.reduce((sum, descriptor) => sum + descriptor.cost, 0);
+
+     // Heavy penalty for non-unique matches
+    cost += (results.length - elements.length) * 500;
 
     // Return object with both count and quality
     return { count, cost };

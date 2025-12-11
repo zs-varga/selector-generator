@@ -306,7 +306,8 @@ var TopDownSelectorOptimizer = class {
         return null;
       }
     }
-    const cost = selectorSet.reduce((sum, descriptor) => sum + descriptor.cost, 0);
+    let cost = selectorSet.reduce((sum, descriptor) => sum + descriptor.cost, 0);
+    cost += (results.length - elements.length) * 500;
     return { count, cost };
   }
   /**
