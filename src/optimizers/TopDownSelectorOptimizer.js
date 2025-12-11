@@ -61,23 +61,24 @@ export class TopDownSelectorOptimizer {
    * Finds the best selector set using top-down optimization with local best solution.
    * Starts with all selectors and iteratively removes selectors (sorted by cost),
    * stopping at the first removal that maintains uniqueness (count = elements.length).
-   * @param {Array<HTMLElement|SVGElement>} elements - The target elements
+   * @param {Array<HTMLElement|SVGElement>} targetElements - The target elements
    * @param {Array<SelectorDescriptor>} selectors - Array of all available selector descriptors
    * @returns {Array<SelectorDescriptor>} Optimized selector set
    */
-  findBest(elements, selectors) {
+  findBest(targetElements, selectors) {
+    const targetCount = targetElements.length;
+
     // Start with all selectors
     let currentSet = [...selectors];
-    let currentValue = this.getValue(elements, currentSet);
-
-    const targetCount = elements.length;
+    let currentValue = this.getValue(targetElements, currentSet);
 
     // If not unique even with all selectors, use debug optimizer to find minimal non-matching set
-    if (!currentValue || currentValue.count !== targetCount) {
+    // Only if we are finding a selector for a single element
+    if (!currentValue || (targetCount === 1 && currentValue.count !== targetCount)) {
       console.warn(
         `Top-down optimizer: All selectors combined do not produce a selector matching exactly ${targetCount} element(s). Finding minimal non-matching subset for debugging.`
       );
-      const minimalNonMatching = this.debugOptimizer.findMinimalNonMatchingSet(elements[0], currentSet);
+      const minimalNonMatching = this.debugOptimizer.findMinimalNonMatchingSet(targetElements[0], currentSet);
       console.log(
         "The problematic selector is this:",
         minimalNonMatching,
@@ -108,7 +109,7 @@ export class TopDownSelectorOptimizer {
         }
 
         const trialSet = currentSet.filter(s => s !== selectorToRemove);
-        const trialValue = this.getValue(elements, trialSet);
+        const trialValue = this.getValue(targetElements, trialSet);
 
         // Check if elements still match exactly (count = targetCount)
         if (trialValue && trialValue.count === targetCount) {
